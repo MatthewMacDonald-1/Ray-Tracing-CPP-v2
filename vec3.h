@@ -55,6 +55,13 @@ class vec3
 		inline static vec3 random(double min, double max) {
 			return vec3(random_double(min,max), random_double(min, max), random_double(min,max));
 		}
+
+		/* Return true if the vector is close to zero in all dimensions. */
+		bool near_zero() const {
+			// Return true if the vector is close to zero in all dimensions.
+			const auto s = 1e-8;
+			return (fabs(e[0]) < s) && (fabs(e[1]) < s) && (fabs(e[2]) < s);
+		}
 	public:	
 		double e[3];
 };
