@@ -32,7 +32,7 @@ color ray_color(const ray& r, const hittable& world, int depth) {
 int main() {
 	// Image
 	const auto aspect_ratio = 16.0 / 9.0;
-	const int image_width = 400;
+	const int image_width = 512;
 	const int image_height = static_cast<int>(image_width / aspect_ratio);
 	const int samples_per_pixel = 100;
 	const int max_depth = 10;
@@ -49,10 +49,6 @@ int main() {
 	world.add(make_shared<sphere>(point3(0.0, 0.0, -1.0), 0.5, material_center));
 	world.add(make_shared<sphere>(point3(-1.0, 0.0, -1.0), 0.5, material_left));
 	world.add(make_shared<sphere>(point3(1.0, 0.0, -1.0), 0.5, material_right));
-
-
-	// world.add(make_shared<sphere>(point3(0, 0, -1), 0.5));
-	// world.add(make_shared<sphere>(point3(0, -100.5, -1), 100));
 
 	// Camera
 	camera cam;
