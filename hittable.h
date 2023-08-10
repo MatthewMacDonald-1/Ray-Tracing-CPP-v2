@@ -1,11 +1,11 @@
-#pragma once
-
 #ifndef HITTABLE_H
 #define HITTABLE_H
 
 #include "rtweekend.h"
+#include "material.h"
 
 class material;
+
 
 struct hit_record {
 	point3 p;
