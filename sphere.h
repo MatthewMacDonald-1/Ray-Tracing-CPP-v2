@@ -9,6 +9,11 @@
 class sphere : public hittable {
 	public:
 		sphere() {}
+		/**
+		 * @param cen Center of sphere
+		 * @param r radius
+		 * @param m material
+		*/
 		sphere(point3 cen, double r, shared_ptr<material> m) 
 			: center(cen), radius(r), mat_ptr(m) {};
 
