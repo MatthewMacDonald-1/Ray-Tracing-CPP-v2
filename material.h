@@ -13,9 +13,9 @@ class material {
         ) const = 0;
 };
 
-class lambertain : public material {
+class lambertian : public material {
     public:
-        lambertain(const color& a) : albedo(a) {}
+        lambertian(const color& a) : albedo(a) {}
 
         virtual bool scatter(
             const ray& r_in, const hit_record& rec, color& attenuation, ray& scattered
