@@ -7,6 +7,11 @@
 #include "material.h"
 
 #include <iostream>
+#include <thread>
+#include <atomic>
+#include <future>
+#include <chrono>
+
 
 
 color ray_color(const ray& r, const hittable& world, int depth) {
@@ -105,14 +110,100 @@ hittable_list random_scene() {
 	return world;
 }
 
+/**
+ * Single core render
+*/
+void render_world_sc(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
+	std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
+
+	int max = image_height * image_width;
+	int count = 0;
+
+	for (int j = image_height - 1; j >= 0; --j) {
+		// std::cerr << "\rScan lines remaining: " << j << ' ' << std::flush;
+		for (int i = 0; i < image_width; ++i) {
+			std::cerr << "\rPixels complete: " << (max - count) << " / " << max << ' ' << std::flush;
+			color pixel_color(0, 0, 0);
+			for (int s = 0; s < samples_per_pixel; ++s) {
+				auto u = (i + random_double()) / (image_width - 1);
+				auto v = (j + random_double()) / (image_height - 1);
+				ray r = cam.get_ray(u, v);
+				pixel_color += ray_color(r, world, max_depth);
+			}
+			write_color(std::cout, pixel_color, samples_per_pixel);
+			count++;
+		}
+	}
+
+
+	std::cerr << "\nDone\n"; // cerr writes to the error output stream
+}
+
+/**
+ * Multi core render
+*/
+void render_world_mt(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
+	int cores = std::thread::hardware_concurrency();
+	volatile std::atomic<std::size_t> count(0);
+	std::vector<std::future<void>> future_vector;
+
+	std::cerr << "Core count: " << cores + '\n';
+
+	int max = image_width * image_height;
+	color *rawPixelColors = (color*)malloc(sizeof(color) * max);
+
+	while (cores--) 
+		future_vector.emplace_back(
+			std::async([=, &world, &count, &rawPixelColors, &image_width, &image_height]()
+			{
+				while (true)
+				{
+					int index = count++;
+					if (index > max)
+						break;
+					int x = index % image_width;
+					int y = index / image_width;
+					color pixel_color(0, 0, 0);
+					for (int s = 0; s < samples_per_pixel; ++s) {
+						auto u = (x + random_double()) / (image_width - 1);
+						auto v = (y + random_double()) / (image_height - 1);
+						ray r = cam.get_ray(u, v);
+						pixel_color += ray_color(r, world, max_depth);
+					}
+					rawPixelColors[y * image_width + x] = pixel_color;
+				}
+			}
+		)
+	);
+	using namespace std::chrono;
+	using namespace std::this_thread;
+
+	while (!(count >= max)) {
+		// Wait
+		sleep_for(nanoseconds(1));
+    	sleep_until(system_clock::now() + seconds(1));
+		std::cerr << "\rPixels complete: " << (max - count) << " / " << max << ' ' << std::flush;
+	}
+
+	std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
+	for (int j = image_height - 1; j >= 0; --j) {
+		// std::cerr << "\rScan lines remaining: " << j << ' ' << std::flush;
+		for (int i = 0; i < image_width; ++i) {
+			write_color(std::cout, rawPixelColors[j * image_width + i], samples_per_pixel);
+		}
+	}
+
+	std::cerr << "\nDone\n"; // cerr writes to the error output stream
+}
+
 int main() {
 	// Image
-	const auto aspect_ratio = 4.0 / 3.0;
-	// const auto aspect_ratio = 16.0 / 9.0;
+	// const auto aspect_ratio = 4.0 / 3.0;
+	const auto aspect_ratio = 16.0 / 9.0;
 	const int image_width = 512;
 	const int image_height = static_cast<int>(image_width / aspect_ratio);
 	const int samples_per_pixel = 10;
-	const int max_depth = 10;
+	const int max_depth = 5;
 
 	// World
 	auto R = cos(pi/4);
@@ -122,32 +213,17 @@ int main() {
 
 	// Camera
 	point3 lookfrom(13,2,3);
+	// point3 lookfrom(0,1,-10);
 	point3 lookat(0,0,0);
 	vec3 vup(0,1,0);
 	auto dist_to_focus = 10.0;
 	auto aperture = 0.1;
-	camera cam(lookfrom, lookat, vup, 20.0, aspect_ratio, aperture, dist_to_focus);
+	camera cam(lookfrom, lookat, vup, 40.0, aspect_ratio, aperture, dist_to_focus);
 
 	// Render
 
-	std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
-
-	for (int j = image_height - 1; j >= 0; --j) {
-		std::cerr << "\rScan lines remaining: " << j << ' ' << std::flush;
-		for (int i = 0; i < image_width; ++i) {
-			color pixel_color(0, 0, 0);
-			for (int s = 0; s < samples_per_pixel; ++s) {
-				auto u = (i + random_double()) / (image_width - 1);
-				auto v = (j + random_double()) / (image_height - 1);
-				ray r = cam.get_ray(u, v);
-				pixel_color += ray_color(r, world, max_depth);
-			}
-			write_color(std::cout, pixel_color, samples_per_pixel);
-		}
-	}
-
-
-	std::cerr << "\nDone\n"; // cerr writes to the error output stream
+	// render_world_sc(world, cam, image_width, image_height, samples_per_pixel, max_depth);
+	render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth);
 
 	return 0;
 }
