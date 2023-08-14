@@ -6,6 +6,9 @@
 #include "camera.h"
 #include "material.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #include <iostream>
 #include <thread>
 #include <atomic>
@@ -135,14 +138,30 @@ void render_world_sc(hittable_list& world, camera cam, int image_width, int imag
 		}
 	}
 
-
 	std::cerr << "\nDone\n"; // cerr writes to the error output stream
+}
+
+/**
+ * 
+*/
+unsigned char* colors_to_byte_array(color* pixels, int length, int samples_per_pixel) {
+	unsigned char* byte_array = (unsigned char*)malloc(3 * length);
+
+	for (int i = 0; i < length; i++) {
+		int byte_index = 3 * i;
+		pixels[i] = correct_color_and_gamma(pixels[i], samples_per_pixel);
+		byte_array[byte_index] = static_cast<unsigned char>(256 * clamp(pixels[i].x(), 0.0, 0.999));
+		byte_array[byte_index + 1] = static_cast<unsigned char>(256 * clamp(pixels[i].y(), 0.0, 0.999));
+		byte_array[byte_index + 2] = static_cast<unsigned char>(256 * clamp(pixels[i].z(), 0.0, 0.999));
+	}
+
+	return byte_array;
 }
 
 /**
  * Multi core render
 */
-void render_world_mt(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
+color* render_world_mt(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
 	int cores = std::thread::hardware_concurrency();
 	volatile std::atomic<std::size_t> count(0);
 	std::vector<std::future<void>> future_vector;
@@ -185,15 +204,32 @@ void render_world_mt(hittable_list& world, camera cam, int image_width, int imag
 		std::cerr << "\rPixels complete: " << (max - count) << " / " << max << ' ' << std::flush;
 	}
 
+	// std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
+	// for (int j = image_height - 1; j >= 0; --j) {
+	// 	// std::cerr << "\rScan lines remaining: " << j << ' ' << std::flush;
+	// 	for (int i = 0; i < image_width; ++i) {
+	// 		write_color(std::cout, rawPixelColors[j * image_width + i], samples_per_pixel);
+	// 	}
+	// }
+
+	//free(rawPixelColors); // free memory
+
+	std::cerr << "\nDone\n"; // cerr writes to the error output stream
+
+	return rawPixelColors;
+}
+
+void render_world_mt_ppm(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
+	color* pixels = render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth);
+
 	std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
 	for (int j = image_height - 1; j >= 0; --j) {
-		// std::cerr << "\rScan lines remaining: " << j << ' ' << std::flush;
 		for (int i = 0; i < image_width; ++i) {
-			write_color(std::cout, rawPixelColors[j * image_width + i], samples_per_pixel);
+			write_color(std::cout, pixels[j * image_width + i], samples_per_pixel);
 		}
 	}
 
-	std::cerr << "\nDone\n"; // cerr writes to the error output stream
+	free(pixels); // free memory
 }
 
 int main() {
@@ -223,7 +259,14 @@ int main() {
 	// Render
 
 	// render_world_sc(world, cam, image_width, image_height, samples_per_pixel, max_depth);
-	render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth);
+	color* pixels = render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth);
+
+	unsigned char* byte_array = colors_to_byte_array(pixels, image_width * image_height, samples_per_pixel);
+	free(pixels); // free memory
+	int result = stbi_write_bmp("test-image-file.bmp", image_width, image_height, 3, byte_array); // TODO: flip image vertically when saving
+	free(byte_array); // free memory
+
+	std::cerr << "Result: " << result << ' ' << std::flush;
 
 	return 0;
 }
