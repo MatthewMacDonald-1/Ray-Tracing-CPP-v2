@@ -27,4 +27,16 @@ void write_color(std::ostream& out, color pixel_color, int samples_per_pixel) {
 		<< static_cast<int>(256 * clamp(b, 0.0, 0.999)) << '\n';
 }
 
+color correct_color_and_gamma(color& pixel_color, int samples_per_pixel) {
+	auto r = pixel_color.x();
+	auto g = pixel_color.y();
+	auto b = pixel_color.z();
+	auto scale = 1.0 / samples_per_pixel;
+	r = sqrt(scale * r);
+	g = sqrt(scale * g);
+	b = sqrt(scale * b);
+
+	return color(r,g,b);
+}
+
 #endif 
