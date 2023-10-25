@@ -15,6 +15,7 @@
 #include <future>
 #include <chrono>
 
+#include "string.h"
 
 
 color ray_color(const ray& r, const hittable& world, int depth) {
@@ -166,7 +167,8 @@ color* render_world_mt(hittable_list& world, camera cam, int image_width, int im
 	volatile std::atomic<std::size_t> count(0);
 	std::vector<std::future<void>> future_vector;
 
-	std::cerr << "Core count: " << cores + '\n';
+	std::cerr << "Core count: " << cores << '\n';
+	std::cerr << "Render Started: \n";
 
 	int max = image_width * image_height;
 	color *rawPixelColors = (color*)malloc(sizeof(color) * max);
@@ -200,8 +202,8 @@ color* render_world_mt(hittable_list& world, camera cam, int image_width, int im
 	while (!(count >= max)) {
 		// Wait
 		sleep_for(nanoseconds(1));
-    	sleep_until(system_clock::now() + seconds(1));
-		std::cerr << "\rPixels complete: " << (max - count) << " / " << max << ' ' << std::flush;
+    	sleep_until(system_clock::now() + nanoseconds(10));
+		// std::cerr << "\rPixels complete: " << (max - count) << " / " << max << ' ' << std::flush;
 	}
 
 	// std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
@@ -214,7 +216,7 @@ color* render_world_mt(hittable_list& world, camera cam, int image_width, int im
 
 	//free(rawPixelColors); // free memory
 
-	std::cerr << "\nDone\n"; // cerr writes to the error output stream
+	std::cerr << "Render Done\n"; // cerr writes to the error output stream
 
 	return rawPixelColors;
 }
@@ -236,7 +238,8 @@ void render_world_mt_ppm(hittable_list& world, camera cam, int image_width, int 
  * Returns a random alphanumeric character
 */
 char genRandomChar() {
-	int select = (int)random_double(1.0, 3.0);
+	int select = 1;
+	// int select = (int)random_double(1.0, 2.0);
 	char randChar;
 	switch (select)
 	{
@@ -264,24 +267,17 @@ int main() {
 	const auto aspect_ratio = 16.0 / 9.0;
 	const int image_width = 1024;
 	const int image_height = static_cast<int>(image_width / aspect_ratio);
-	const int samples_per_pixel = 10;
+	const int samples_per_pixel = 1;
 	const int max_depth = 10;
 
 	// World
 	auto R = cos(pi/4);
 	hittable_list world = random_scene();
 
-	std::string rand;
-
+	char rand[16];
 	for (int i = 0; i < 16; i++) {
-		if (rand.length() > 0) 
-			rand += genRandomChar();
-		else
-			rand = genRandomChar();
+		rand[i] = genRandomChar();
 	}
-
-	std::cerr << "Name: " << rand << std::endl;
-
 
 	// Camera
 	point3 lookfrom(13,2,3);
@@ -300,13 +296,20 @@ int main() {
 	unsigned char* byte_array = colors_to_byte_array(pixels, image_width * image_height, samples_per_pixel);
 	free(pixels); // free memory
 	stbi_flip_vertically_on_write(true);
-	std::string fileName = "renders/";
-	fileName.append(rand);
-	fileName.append(".bmp");
-	int result = stbi_write_bmp(fileName, image_width, image_height, 3, byte_array); // TODO: flip image vertically when saving
-	free(byte_array); // free memory
 
-	std::cerr << "Result: " << result << ' ' << std::flush;
+	std::cerr << "Make file name\n"; 
+
+	char base[] = { 'r','e','n','d','e','r','s','\\' };
+	char *fileName = strcat(base, strcat(rand, ".bmp"));
+
+	std::cerr << fileName << std::endl;
+
+	int result = stbi_write_bmp(fileName, image_width, image_height, 3, byte_array); // TODO: flip image vertically when saving
+
+	std::cerr << "Wrote file\n";
+	// free(byte_array); // free memory
+
+	// std::cerr << "Result: " << result << ' ' << std::flush;
 
 	return 0;
 }
