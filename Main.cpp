@@ -232,6 +232,32 @@ void render_world_mt_ppm(hittable_list& world, camera cam, int image_width, int 
 	free(pixels); // free memory
 }
 
+/**
+ * Returns a random alphanumeric character
+*/
+char genRandomChar() {
+	int select = (int)random_double(1.0, 3.0);
+	char randChar;
+	switch (select)
+	{
+	case 1:
+		randChar = (char)random_double(48, 57);
+		break;
+	case 2:
+		randChar = (char)random_double(97, 122);
+		break;
+	case 3:
+		randChar = (char)random_double(65, 90);
+		break;
+	
+	default:
+		randChar = (char)random_double(97, 122);
+		break;
+	}
+
+	return randChar;
+}
+
 int main() {
 	// Image
 	// const auto aspect_ratio = 4.0 / 3.0;
@@ -245,6 +271,16 @@ int main() {
 	auto R = cos(pi/4);
 	hittable_list world = random_scene();
 
+	std::string rand;
+
+	for (int i = 0; i < 16; i++) {
+		if (rand.length() > 0) 
+			rand += genRandomChar();
+		else
+			rand = genRandomChar();
+	}
+
+	std::cerr << "Name: " << rand << std::endl;
 
 
 	// Camera
@@ -264,7 +300,10 @@ int main() {
 	unsigned char* byte_array = colors_to_byte_array(pixels, image_width * image_height, samples_per_pixel);
 	free(pixels); // free memory
 	stbi_flip_vertically_on_write(true);
-	int result = stbi_write_bmp("renders/test-image-file.bmp", image_width, image_height, 3, byte_array); // TODO: flip image vertically when saving
+	std::string fileName = "renders/";
+	fileName.append(rand);
+	fileName.append(".bmp");
+	int result = stbi_write_bmp(fileName, image_width, image_height, 3, byte_array); // TODO: flip image vertically when saving
 	free(byte_array); // free memory
 
 	std::cerr << "Result: " << result << ' ' << std::flush;
