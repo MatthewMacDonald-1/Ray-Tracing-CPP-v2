@@ -1,0 +1,9 @@
+CMAKE_MINIMUM_REQUIRED(VERSION "3.12")
+
+set(CMAKE_CXX_STANDARD 17)
+
+project(RAY_TRACER)
+
+add_executable(RAY_TRACER 
+    Main.cpp
+)
