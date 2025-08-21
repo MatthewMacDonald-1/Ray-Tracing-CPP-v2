@@ -14,6 +14,10 @@
 #include <atomic>
 #include <future>
 #include <chrono>
+#include <sstream>
+#include <string>
+#include <mutex>
+#include <cmath>
 
 #include "string.h"
 
@@ -164,8 +168,12 @@ unsigned char* colors_to_byte_array(color* pixels, int length, int samples_per_p
 */
 color* render_world_mt(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
 	int cores = std::thread::hardware_concurrency();
-	volatile std::atomic<std::size_t> count(0);
+	// volatile std::atomic<std::size_t> count(0);
+
+	int count = 0;
 	std::vector<std::future<void>> future_vector;
+	int blockSize = 32;
+	std::mutex checkoutIndexLock;
 
 	std::cerr << "Core count: " << cores << '\n';
 	std::cerr << "Render Started: \n";
@@ -175,23 +183,39 @@ color* render_world_mt(hittable_list& world, camera cam, int image_width, int im
 
 	while (cores--) 
 		future_vector.emplace_back(
-			std::async([=, &world, &count, &rawPixelColors, &image_width, &image_height]()
+			std::async([=, &world, &count, &rawPixelColors, &image_width, &image_height, &checkoutIndexLock, &blockSize]()
 			{
 				while (true)
 				{
-					int index = count++;
-					if (index > max)
+					checkoutIndexLock.lock();
+					if (count >= max) {
+
+						checkoutIndexLock.unlock();
 						break;
-					int x = index % image_width;
-					int y = index / image_width;
-					color pixel_color(0, 0, 0);
-					for (int s = 0; s < samples_per_pixel; ++s) {
-						auto u = (x + random_double()) / (image_width - 1);
-						auto v = (y + random_double()) / (image_height - 1);
-						ray r = cam.get_ray(u, v);
-						pixel_color += ray_color(r, world, max_depth);
 					}
-					rawPixelColors[y * image_width + x] = pixel_color;
+					int indexStart = count;
+					int blockToDo = (int)std::min(blockSize, max - indexStart);
+					count += blockToDo;
+					checkoutIndexLock.unlock();
+
+					// int index = count++;
+					// if (index >= max)
+					// 	break;
+
+					for (int i = 0; i < blockToDo; i++) {
+						int index = indexStart + i;
+						int x = index % image_width;
+						int y = index / image_width;
+						color pixel_color(0, 0, 0);
+						for (int s = 0; s < samples_per_pixel; ++s) {
+							auto u = (x + random_double()) / (image_width - 1);
+							auto v = (y + random_double()) / (image_height - 1);
+							ray r = cam.get_ray(u, v);
+							pixel_color += ray_color(r, world, max_depth);
+						}
+						rawPixelColors[y * image_width + x] = pixel_color;
+					}
+					
 				}
 			}
 		)
@@ -201,10 +225,12 @@ color* render_world_mt(hittable_list& world, camera cam, int image_width, int im
 
 	while (!(count >= max)) {
 		// Wait
-		sleep_for(nanoseconds(1));
-    	sleep_until(system_clock::now() + nanoseconds(10));
-		// std::cerr << "\rPixels complete: " << (max - count) << " / " << max << ' ' << std::flush;
+		// sleep_for(nanoseconds(1));
+    	sleep_until(system_clock::now() + nanoseconds(75000000));
+		std::cerr << "\rPixels complete: " << (count) << " / " << max << " " << (std::round(count / (double)max * 10000) / 100) << "%" << std::flush;
 	}
+
+	std::cerr << std::endl;
 
 	// std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
 	// for (int j = image_height - 1; j >= 0; --j) {
@@ -238,8 +264,8 @@ void render_world_mt_ppm(hittable_list& world, camera cam, int image_width, int 
  * Returns a random alphanumeric character
 */
 char genRandomChar() {
-	int select = 1;
-	// int select = (int)random_double(1.0, 2.0);
+	// int select = 1;
+	int select = (int)random_double(1.0, 3.0);
 	char randChar;
 	switch (select)
 	{
@@ -265,10 +291,10 @@ int main() {
 	// Image
 	// const auto aspect_ratio = 4.0 / 3.0;
 	const auto aspect_ratio = 16.0 / 9.0;
-	const int image_width = 1024;
+	const int image_width = 512;
 	const int image_height = static_cast<int>(image_width / aspect_ratio);
-	const int samples_per_pixel = 1;
-	const int max_depth = 10;
+	const int samples_per_pixel = 200;
+	const int max_depth = 4;
 
 	// World
 	auto R = cos(pi/4);
@@ -276,6 +302,10 @@ int main() {
 
 	char rand[16];
 	for (int i = 0; i < 16; i++) {
+		if (i == 15) {
+			rand[i] = '\0';
+			break;
+		}
 		rand[i] = genRandomChar();
 	}
 
@@ -293,18 +323,21 @@ int main() {
 	// render_world_sc(world, cam, image_width, image_height, samples_per_pixel, max_depth);
 	color* pixels = render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth);
 
+	std::cerr << "Convert to byte array" << std::endl;
+
 	unsigned char* byte_array = colors_to_byte_array(pixels, image_width * image_height, samples_per_pixel);
 	free(pixels); // free memory
 	stbi_flip_vertically_on_write(true);
 
 	std::cerr << "Make file name\n"; 
 
-	char base[] = { 'r','e','n','d','e','r','s','\\' };
-	char *fileName = strcat(base, strcat(rand, ".bmp"));
+	std::stringstream ss;
+	ss << "render" << rand << ".bmp";
+	std::string fileName = ss.str();
 
 	std::cerr << fileName << std::endl;
 
-	int result = stbi_write_bmp(fileName, image_width, image_height, 3, byte_array); // TODO: flip image vertically when saving
+	int result = stbi_write_bmp(fileName.c_str(), image_width, image_height, 3, byte_array); // TODO: flip image vertically when saving
 
 	std::cerr << "Wrote file\n";
 	// free(byte_array); // free memory
