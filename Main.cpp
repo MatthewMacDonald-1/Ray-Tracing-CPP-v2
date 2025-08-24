@@ -166,13 +166,13 @@ unsigned char* colors_to_byte_array(color* pixels, int length, int samples_per_p
 /**
  * Multi core render
 */
-color* render_world_mt(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
+color* render_world_mt(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth, int blockSize) {
 	int cores = std::thread::hardware_concurrency();
 	// volatile std::atomic<std::size_t> count(0);
 
 	int count = 0;
 	std::vector<std::future<void>> future_vector;
-	int blockSize = 32;
+	// int blockSize = 32;
 	std::mutex checkoutIndexLock;
 
 	std::cerr << "Core count: " << cores << '\n';
@@ -232,23 +232,13 @@ color* render_world_mt(hittable_list& world, camera cam, int image_width, int im
 
 	std::cerr << std::endl;
 
-	// std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
-	// for (int j = image_height - 1; j >= 0; --j) {
-	// 	// std::cerr << "\rScan lines remaining: " << j << ' ' << std::flush;
-	// 	for (int i = 0; i < image_width; ++i) {
-	// 		write_color(std::cout, rawPixelColors[j * image_width + i], samples_per_pixel);
-	// 	}
-	// }
-
-	//free(rawPixelColors); // free memory
-
-	std::cerr << "Render Done\n"; // cerr writes to the error output stream
+	std::cerr << "Render Done" << std::endl; // cerr writes to the error output stream
 
 	return rawPixelColors;
 }
 
-void render_world_mt_ppm(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth) {
-	color* pixels = render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth);
+void render_world_mt_ppm(hittable_list& world, camera cam, int image_width, int image_height, int samples_per_pixel, int max_depth, int blockSize) {
+	color* pixels = render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth, blockSize);
 
 	std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
 	for (int j = image_height - 1; j >= 0; --j) {
@@ -291,10 +281,11 @@ int main() {
 	// Image
 	// const auto aspect_ratio = 4.0 / 3.0;
 	const auto aspect_ratio = 16.0 / 9.0;
-	const int image_width = 512;
+	const int image_width = 4092;
 	const int image_height = static_cast<int>(image_width / aspect_ratio);
-	const int samples_per_pixel = 200;
-	const int max_depth = 4;
+	const int samples_per_pixel = 25;
+	const int max_depth = 5;
+	const int blockSize = 2048;
 
 	// World
 	auto R = cos(pi/4);
@@ -321,7 +312,7 @@ int main() {
 	// Render
 
 	// render_world_sc(world, cam, image_width, image_height, samples_per_pixel, max_depth);
-	color* pixels = render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth);
+	color* pixels = render_world_mt(world, cam, image_width, image_height, samples_per_pixel, max_depth, blockSize);
 
 	std::cerr << "Convert to byte array" << std::endl;
 
