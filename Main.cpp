@@ -277,7 +277,7 @@ char genRandomChar() {
 	return randChar;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
 	// Image
 	// const auto aspect_ratio = 4.0 / 3.0;
 	const auto aspect_ratio = 16.0 / 9.0;
@@ -325,6 +325,10 @@ int main() {
 	std::stringstream ss;
 	ss << "render" << rand << ".bmp";
 	std::string fileName = ss.str();
+
+	if (argc == 2) {
+		fileName = argv[1];
+	}
 
 	std::cerr << fileName << std::endl;
 
