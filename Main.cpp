@@ -22,6 +22,7 @@
 #include "string.h"
 #include "timer.h"
 
+#define ANTI_ALIASING true
 
 color ray_color(const ray& r, const hittable& world, int depth) {
 	hit_record rec;
@@ -209,8 +210,13 @@ color* render_world_mt(hittable_list& world, camera cam, int image_width, int im
 						int y = index / image_width;
 						color pixel_color(0, 0, 0);
 						for (int s = 0; s < samples_per_pixel; ++s) {
+							#if ANTI_ALIASING
 							auto u = (x + random_double()) / (image_width - 1);
 							auto v = (y + random_double()) / (image_height - 1);
+							#else
+							auto u = (x + 0.5) / (image_width - 1);
+							auto v = (y + 0.5) / (image_height - 1);
+							#endif
 							ray r = cam.get_ray(u, v);
 							pixel_color += ray_color(r, world, max_depth);
 						}
@@ -284,7 +290,7 @@ int main(int argc, char* argv[]) {
 	const auto aspect_ratio = 16.0 / 9.0;
 	const int image_width = 512;
 	const int image_height = static_cast<int>(image_width / aspect_ratio);
-	const int samples_per_pixel = 25;
+	const int samples_per_pixel = 5;
 	const int max_depth = 5;
 	const int blockSize = 128;
 
